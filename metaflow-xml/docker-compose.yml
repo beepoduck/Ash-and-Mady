@@ -1,0 +1,16 @@
+services:
+  metaflow-xml:
+    build: .
+    image: metaflow-xml
+    volumes:
+      # Pipeline outputs (raw files, mzXML, feature table, MGF) land here
+      - ./data:/data
+      # Mount your workflow XML — edit the left side to point at your file
+      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro
+    environment:
+      # Override any pipeline directory if needed
+      - RAW_DIR=/data/raw
+      - MZXML_DIR=/data/mzxml
+      - OUTPUT_DIR=/data/output
+      - BATCH_XML=/data/mzmine_batch.xml
+      - WORKFLOW_XML_PATH=/usr/local/share/metabolomics_workflow.xml

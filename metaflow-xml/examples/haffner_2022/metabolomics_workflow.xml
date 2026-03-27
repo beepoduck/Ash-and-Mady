@@ -1,0 +1,821 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hierarchical Metabolomics Workflow Representation
+  Study:     Haffner et al. 2022 — Core Fecal Metabolome
+  Dataset:   MSV000084794 (MassIVE)
+  Schema:    4-level hierarchy (L0 Intent → L1 Method → L2 Implementation → L3 Execution)
+  Node types: Stage | Operation | ToolCall | Artifact | Decision | QC
+  Edge types: dataflow | controlflow | refines | parameterizes | evaluates | provenance
+-->
+
+<workflow
+  id="metabolomics_workflow_MSV000084794"
+  schema_version="1.0"
+  description="Untargeted fecal LC-MS/MS metabolomics pipeline — Haffner et al. 2022"
+  ion_mode="positive"
+  instrument_type="LC-MS/MS"
+  sample_type="fecal"
+  github="https://github.com/jhaffner09/core_metabolome_2021">
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       ARTIFACTS  (typed data objects flowing through the pipeline)
+       ═══════════════════════════════════════════════════════════════ -->
+  <artifacts>
+
+    <artifact id="raw_files"
+      type="raw_ms"
+      format="proprietary"
+      description="Raw mass spectrometry acquisition files from MassIVE"
+      ms_level="MS1+MS2"
+      sample_set="MSV000084794"
+      produced_by="tool_wget"/>
+
+    <artifact id="mzxml_files"
+      type="mzXML"
+      format=".mzXML"
+      description="Centroided, converted mzXML files"
+      ms_level="MS1+MS2"
+      produced_by="tool_msconvert"
+      consumed_by="tool_ms1_detect tool_ms2_detect tool_chrom_builder"/>
+
+    <artifact id="ms1_mass_list"
+      type="mass_list"
+      format="MZmine internal"
+      description="MS1 mass detection output"
+      ms_level="MS1"
+      produced_by="tool_ms1_detect"
+      consumed_by="tool_chrom_builder"/>
+
+    <artifact id="ms2_mass_list"
+      type="mass_list"
+      format="MZmine internal"
+      description="MS2 mass detection output"
+      ms_level="MS2"
+      produced_by="tool_ms2_detect"
+      consumed_by="tool_chrom_builder"/>
+
+    <artifact id="chromatograms"
+      type="chromatogram_list"
+      format="MZmine internal"
+      description="Extracted ion chromatograms (EICs)"
+      produced_by="tool_chrom_builder"
+      consumed_by="tool_deconvolution"/>
+
+    <artifact id="deconvolved_peaks"
+      type="peak_list"
+      format="MZmine internal"
+      description="Chromatographically deconvolved features"
+      produced_by="tool_deconvolution"
+      consumed_by="tool_isotope_grouper"/>
+
+    <artifact id="isotope_grouped_peaks"
+      type="peak_list"
+      format="MZmine internal"
+      description="Isotope-grouped feature list"
+      produced_by="tool_isotope_grouper"
+      consumed_by="tool_join_aligner"/>
+
+    <artifact id="aligned_feature_table"
+      type="feature_table"
+      format="MZmine internal"
+      description="Cross-sample aligned feature table"
+      produced_by="tool_join_aligner"
+      consumed_by="tool_row_filter"/>
+
+    <artifact id="filtered_feature_table"
+      type="feature_table"
+      format="MZmine internal"
+      description="Row-filtered feature table (RT range + MS2 requirement)"
+      produced_by="tool_row_filter"
+      consumed_by="tool_gap_fill"/>
+
+    <artifact id="gapfilled_feature_table"
+      type="feature_table"
+      format="MZmine internal"
+      description="Gap-filled feature table (primary analysis table)"
+      produced_by="tool_gap_fill"
+      consumed_by="tool_export_mgf tool_export_csv"/>
+
+    <artifact id="mgf_file"
+      type="ms2_spectra"
+      format=".mgf"
+      description="MS2 spectra for GNPS FBMN input"
+      produced_by="tool_export_mgf"
+      consumed_by="tool_fbmn"/>
+
+    <artifact id="csv_feature_table"
+      type="feature_table"
+      format=".csv"
+      description="Feature table for downstream filtering and GNPS input"
+      produced_by="tool_export_csv"
+      consumed_by="tool_blank_filter"/>
+
+    <artifact id="blank_filtered_csv"
+      type="feature_table"
+      format=".csv"
+      description="Feature table after blank subtraction"
+      produced_by="tool_blank_filter"
+      consumed_by="tool_feature_filter tool_tic_norm"/>
+
+    <artifact id="feature_filtered_csv"
+      type="feature_table"
+      format=".csv"
+      description="Feature table after 6-sample-per-population filter"
+      produced_by="tool_feature_filter"
+      consumed_by="tool_tic_norm tool_fbmn"/>
+
+    <artifact id="normalized_csv"
+      type="feature_table"
+      format=".csv"
+      description="TIC-normalized feature table"
+      produced_by="tool_tic_norm"
+      consumed_by="tool_fbmn tool_mmvec tool_pcoa tool_kruskal tool_boxplots tool_upset tool_anova"/>
+
+    <artifact id="gnps_network_results"
+      type="molecular_network"
+      format="graphml + tsv"
+      description="GNPS FBMN molecular network and library hits"
+      produced_by="tool_fbmn"
+      consumed_by="tool_cytoscape tool_molnetenhancer tool_masst"/>
+
+    <artifact id="library_hits"
+      type="spectral_annotations"
+      format=".tsv"
+      description="Spectral library matches from GNPS"
+      produced_by="tool_fbmn"
+      consumed_by="tool_masst"/>
+
+    <artifact id="class_annotations"
+      type="chemical_classifications"
+      format=".tsv"
+      description="ClassyFire / MolNetEnhancer chemical class annotations"
+      produced_by="tool_molnetenhancer"
+      consumed_by="tool_random_forest"/>
+
+    <artifact id="masst_results"
+      type="dataset_matches"
+      format=".tsv"
+      description="Cross-study spectral matches from MASST"
+      produced_by="tool_masst"/>
+
+    <artifact id="pca_plots"
+      type="figure"
+      format=".pdf/.png"
+      description="mmvec PCA plots"
+      produced_by="tool_mmvec"/>
+
+    <artifact id="pcoa_plots"
+      type="figure"
+      format=".qzv"
+      description="Beta diversity PCoA (EMPeror)"
+      produced_by="tool_pcoa"/>
+
+    <artifact id="rf_selected_features"
+      type="feature_table"
+      format=".csv"
+      description="Features selected by random forest analysis"
+      produced_by="tool_random_forest"
+      consumed_by="tool_sirius"/>
+
+    <artifact id="sirius_class_annotations"
+      type="chemical_classifications"
+      format=".tsv"
+      description="CANOPUS class-level annotations from SIRIUS"
+      produced_by="tool_sirius"/>
+
+    <artifact id="statistical_figures"
+      type="figure"
+      format=".pdf/.png"
+      description="Boxplots, UpSet plots, ANOVA results"
+      produced_by="tool_boxplots tool_upset tool_anova"/>
+
+  </artifacts>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       PARAMETER SETS
+       ═══════════════════════════════════════════════════════════════ -->
+  <parameter_sets>
+
+    <parameter_set id="params_ms1_detection">
+      <param key="noise_level" value="180000.0" unit="counts"/>
+    </parameter_set>
+
+    <parameter_set id="params_ms2_detection">
+      <param key="noise_level" value="1000.0" unit="counts"/>
+    </parameter_set>
+
+    <parameter_set id="params_chrom_builder">
+      <param key="min_time_span" value="0.01" unit="min"/>
+      <param key="min_height" value="540000.0" unit="counts"/>
+      <param key="mz_tolerance" value="10" unit="ppm"/>
+      <param key="filter" value="MS1"/>
+    </parameter_set>
+
+    <parameter_set id="params_deconvolution">
+      <param key="chromatographic_threshold" value="5" unit="%"/>
+      <param key="search_min_rt_range" value="0.10" unit="min"/>
+      <param key="min_relative_height" value="15" unit="%"/>
+      <param key="min_absolute_height" value="300000.0" unit="counts"/>
+      <param key="min_ratio_peak_top_edge" value="2"/>
+      <param key="peak_duration_min" value="0.01" unit="min"/>
+      <param key="peak_duration_max" value="1.5" unit="min"/>
+      <param key="ms2_pairing_mz_range" value="0.01" unit="Da"/>
+      <param key="ms2_pairing_rt_range" value="0.1" unit="min"/>
+    </parameter_set>
+
+    <parameter_set id="params_isotope_grouper">
+      <param key="mz_tolerance" value="0.01" unit="ppm"/>
+      <param key="rt_tolerance" value="0.05" unit="min"/>
+      <param key="max_charge" value="3"/>
+      <param key="representative_isotope" value="lowest_mz"/>
+      <param key="monotonic_shape" value="true"/>
+    </parameter_set>
+
+    <parameter_set id="params_join_aligner">
+      <param key="mz_tolerance" value="10" unit="ppm"/>
+      <param key="weight_mz" value="5"/>
+      <param key="weight_rt" value="1"/>
+      <param key="rt_tolerance" value="0.5" unit="min"/>
+    </parameter_set>
+
+    <parameter_set id="params_row_filter">
+      <param key="rt_min" value="0.2" unit="min"/>
+      <param key="rt_max" value="12.51" unit="min"/>
+      <param key="min_peaks_per_row" value=""/>
+      <param key="require_ms2_gnps" value="true"/>
+    </parameter_set>
+
+    <parameter_set id="params_gap_fill">
+      <param key="intensity_tolerance" value="75" unit="%"/>
+      <param key="mz_tolerance_ppm" value="10" unit="ppm"/>
+      <param key="mz_tolerance_abs" value="0.000001" unit="Da"/>
+      <param key="rt_tolerance" value="0.3" unit="min"/>
+      <param key="rt_correction" value="true"/>
+    </parameter_set>
+
+    <parameter_set id="params_fbmn">
+      <param key="precursor_mass_tolerance" value="0.02" unit="Da"/>
+      <param key="fragment_mass_tolerance" value="0.02" unit="Da"/>
+      <param key="min_cosine_score_network" value="0.7"/>
+      <param key="min_cosine_score_library" value="0.7"/>
+      <param key="min_matched_fragment_ions_network" value="4"/>
+      <param key="min_matched_fragment_ions_library" value="4"/>
+      <param key="network_topK" value="50"/>
+      <param key="max_component_size" value="100"/>
+      <param key="max_shift_between_precursors" value="500" unit="Da"/>
+      <param key="analog_search" value="enabled"/>
+      <param key="max_analog_mass_difference" value="100" unit="Da"/>
+      <param key="precursor_window_filtering" value="enabled"/>
+      <param key="peak_window_filtering_50da" value="enabled"/>
+      <param key="normalization" value="row_sum_per_file"/>
+    </parameter_set>
+
+    <parameter_set id="params_masst">
+      <param key="parent_mass_tolerance" value="0.02" unit="Da"/>
+      <param key="min_matched_peaks" value="4"/>
+      <param key="ion_tolerance" value="0.5" unit="Da"/>
+      <param key="score_threshold" value="0.7"/>
+      <param key="top_hits_per_spectrum" value="1"/>
+      <param key="databases" value="GNPS,MetabolomicsWorkbench,MetaboLights,Foodomics,SkinTraceEvidence"/>
+      <param key="analog_search" value="disabled"/>
+      <param key="unclustered_data_search" value="disabled"/>
+    </parameter_set>
+
+    <parameter_set id="params_random_forest">
+      <param key="trees_min" value="5"/>
+      <param key="trees_final" value="200" note="plateau from OOB error"/>
+      <param key="downstream_annotation" value="SIRIUS_v4.4.26_CANOPUS_ClassyFire"/>
+    </parameter_set>
+
+    <parameter_set id="params_boxplots">
+      <param key="center_line" value="median"/>
+      <param key="box_bounds" value="upper_lower_quartiles"/>
+      <param key="whiskers" value="IQR_x_1.5"/>
+      <param key="outliers" value="dots"/>
+      <param key="packages" value="ggplot2,rworldmap"/>
+    </parameter_set>
+
+    <parameter_set id="params_wget">
+      <param key="flags" value="-r -np -nH --cut-dirs=3"/>
+      <param key="source" value="ftp://massive.ucsd.edu/v02/MSV000084794/"/>
+    </parameter_set>
+
+    <parameter_set id="params_msconvert">
+      <param key="output_format" value="mzXML"/>
+      <param key="filter" value="peakPicking centroid ms1-2"/>
+    </parameter_set>
+
+  </parameter_sets>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       L0  —  INTENT GRAPH  (Why)
+       Coarse pipeline stages with dataflow
+       ═══════════════════════════════════════════════════════════════ -->
+  <graph level="L0" description="Abstract pipeline stages">
+
+    <nodes>
+      <node id="stage_ingest"      type="Stage" label="Access Raw Data"          refines_to="L1_ingest"/>
+      <node id="stage_convert"     type="Stage" label="Process Raw MS Files"     refines_to="L1_convert"/>
+      <node id="stage_features"    type="Stage" label="Generate Feature Table"   refines_to="L1_features"/>
+      <node id="stage_process"     type="Stage" label="Process Feature Table"    refines_to="L1_process"/>
+      <node id="stage_annotate"    type="Stage" label="Annotate Features"        refines_to="L1_annotate"/>
+      <node id="stage_evaluate"    type="Stage" label="Evaluate Annotations"     refines_to="L1_evaluate"/>
+      <node id="stage_stats"       type="Stage" label="Statistical Analysis"     refines_to="L1_stats"/>
+    </nodes>
+
+    <edges>
+      <edge source="stage_ingest"   target="stage_convert"  type="controlflow"/>
+      <edge source="stage_convert"  target="stage_features" type="controlflow"/>
+      <edge source="stage_features" target="stage_process"  type="controlflow"/>
+      <edge source="stage_process"  target="stage_annotate" type="controlflow"/>
+      <edge source="stage_annotate" target="stage_evaluate" type="controlflow"/>
+      <edge source="stage_evaluate" target="stage_stats"    type="controlflow"/>
+      <!-- cross-stage dataflow -->
+      <edge source="stage_features" target="stage_annotate" type="dataflow" artifact="mgf_file"/>
+      <edge source="stage_process"  target="stage_annotate" type="dataflow" artifact="normalized_csv"/>
+      <edge source="stage_evaluate" target="stage_stats"    type="dataflow" artifact="class_annotations"/>
+    </edges>
+
+  </graph>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       L1  —  METHOD GRAPHS  (What)
+       Each stage broken into operations
+       ═══════════════════════════════════════════════════════════════ -->
+
+  <graph level="L1" id="L1_ingest" parent="stage_ingest" description="Data acquisition operations">
+    <nodes>
+      <node id="op_db_pull" type="Operation" label="Pull dataset from MassIVE database" refines_to="L2_ingest"/>
+    </nodes>
+    <edges/>
+  </graph>
+
+  <graph level="L1" id="L1_convert" parent="stage_convert" description="Raw file conversion operations">
+    <nodes>
+      <node id="op_convert_mzxml" type="Operation" label="Convert raw files to centroided mzXML" refines_to="L2_convert"/>
+    </nodes>
+    <edges/>
+  </graph>
+
+  <graph level="L1" id="L1_features" parent="stage_features" description="Feature detection and alignment operations">
+    <nodes>
+      <node id="op_ms1_detect"    type="Operation" label="MS1 Mass Detection"                refines_to="L2_ms1_detect"/>
+      <node id="op_ms2_detect"    type="Operation" label="MS2 Mass Detection"                refines_to="L2_ms2_detect"/>
+      <node id="op_chrom_build"   type="Operation" label="Chromatogram Building"             refines_to="L2_chrom_build"/>
+      <node id="op_deconvolve"    type="Operation" label="Chromatogram Deconvolution"        refines_to="L2_deconvolve"/>
+      <node id="op_isotope_group" type="Operation" label="Isotopic Peak Grouping"            refines_to="L2_isotope_group"/>
+      <node id="op_align"         type="Operation" label="Cross-sample Feature Alignment"   refines_to="L2_align"/>
+      <node id="op_row_filter"    type="Operation" label="Peak List Row Filtering"           refines_to="L2_row_filter"/>
+      <node id="op_gap_fill"      type="Operation" label="Gap Filling"                       refines_to="L2_gap_fill"/>
+      <node id="op_export"        type="Operation" label="Export MGF and CSV"               refines_to="L2_export"/>
+    </nodes>
+    <edges>
+      <edge source="op_ms1_detect"    target="op_chrom_build"   type="controlflow"/>
+      <edge source="op_ms2_detect"    target="op_chrom_build"   type="controlflow"/>
+      <edge source="op_chrom_build"   target="op_deconvolve"    type="controlflow"/>
+      <edge source="op_deconvolve"    target="op_isotope_group" type="controlflow"/>
+      <edge source="op_isotope_group" target="op_align"         type="controlflow"/>
+      <edge source="op_align"         target="op_row_filter"    type="controlflow"/>
+      <edge source="op_row_filter"    target="op_gap_fill"      type="controlflow"/>
+      <edge source="op_gap_fill"      target="op_export"        type="controlflow"/>
+      <!-- dataflow -->
+      <edge source="op_ms1_detect"    target="op_chrom_build"   type="dataflow" artifact="ms1_mass_list"/>
+      <edge source="op_ms2_detect"    target="op_chrom_build"   type="dataflow" artifact="ms2_mass_list"/>
+      <edge source="op_chrom_build"   target="op_deconvolve"    type="dataflow" artifact="chromatograms"/>
+      <edge source="op_deconvolve"    target="op_isotope_group" type="dataflow" artifact="deconvolved_peaks"/>
+      <edge source="op_isotope_group" target="op_align"         type="dataflow" artifact="isotope_grouped_peaks"/>
+      <edge source="op_align"         target="op_row_filter"    type="dataflow" artifact="aligned_feature_table"/>
+      <edge source="op_row_filter"    target="op_gap_fill"      type="dataflow" artifact="filtered_feature_table"/>
+      <edge source="op_gap_fill"      target="op_export"        type="dataflow" artifact="gapfilled_feature_table"/>
+    </edges>
+  </graph>
+
+  <graph level="L1" id="L1_process" parent="stage_process" description="Feature table processing operations">
+    <nodes>
+      <node id="op_blank_filter"    type="Operation" label="Blank Subtraction Filtering"        refines_to="L2_blank_filter"/>
+      <node id="op_feature_filter"  type="Operation" label="6-Sample Population Filter"         refines_to="L2_feature_filter"/>
+      <node id="op_tic_norm"        type="Operation" label="Total Ion Current Normalization"    refines_to="L2_tic_norm"/>
+    </nodes>
+    <edges>
+      <edge source="op_blank_filter"   target="op_feature_filter" type="controlflow"/>
+      <edge source="op_feature_filter" target="op_tic_norm"        type="controlflow"/>
+      <edge source="op_blank_filter"   target="op_feature_filter" type="dataflow" artifact="blank_filtered_csv"/>
+      <edge source="op_feature_filter" target="op_tic_norm"        type="dataflow" artifact="feature_filtered_csv"/>
+    </edges>
+  </graph>
+
+  <graph level="L1" id="L1_annotate" parent="stage_annotate" description="Spectral annotation operations">
+    <nodes>
+      <node id="op_fbmn" type="Operation" label="Feature-Based Molecular Networking (FBMN)" refines_to="L2_fbmn"/>
+    </nodes>
+    <edges/>
+  </graph>
+
+  <graph level="L1" id="L1_evaluate" parent="stage_evaluate" description="Annotation evaluation operations">
+    <nodes>
+      <node id="op_visual_eval"    type="Operation" label="Visual Evaluation (Mirror Plots / Cosine)" refines_to="L2_visual_eval"/>
+      <node id="op_mol_class"      type="Operation" label="Molecular Classification"                  refines_to="L2_mol_class"/>
+      <node id="op_masst"          type="Operation" label="Cross-dataset Matching (MASST)"            refines_to="L2_masst"/>
+    </nodes>
+    <edges>
+      <edge source="op_fbmn"       target="op_visual_eval" type="controlflow"/>
+      <edge source="op_fbmn"       target="op_mol_class"   type="controlflow"/>
+      <edge source="op_fbmn"       target="op_masst"       type="controlflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L1" id="L1_stats" parent="stage_stats" description="Statistical analysis operations">
+    <nodes>
+      <node id="op_mmvec"      type="Operation" label="Microbe–Metabolite Vectors (mmvec)"  refines_to="L2_mmvec"/>
+      <node id="op_pcoa"       type="Operation" label="Beta Diversity PCoA + PERMANOVA"     refines_to="L2_pcoa"/>
+      <node id="op_kruskal"    type="Operation" label="Kruskal-Wallis significance"         refines_to="L2_kruskal"/>
+      <node id="op_boxplots"   type="Operation" label="Box Plots"                           refines_to="L2_boxplots"/>
+      <node id="op_anova"      type="Operation" label="ANOVA effect size"                  refines_to="L2_anova"/>
+      <node id="op_upset"      type="Operation" label="UpSet Plots"                        refines_to="L2_upset"/>
+      <node id="op_rf"         type="Operation" label="Random Forest Classification"        refines_to="L2_rf"/>
+      <node id="op_sirius"     type="Operation" label="Class-level Annotation (SIRIUS)"    refines_to="L2_sirius"/>
+    </nodes>
+    <edges>
+      <edge source="op_rf"    target="op_sirius" type="controlflow"/>
+      <edge source="op_rf"    target="op_sirius" type="dataflow" artifact="rf_selected_features"/>
+    </edges>
+  </graph>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       L2  —  IMPLEMENTATION GRAPHS  (How)
+       Operations bound to concrete tools + parameter schemas
+       ═══════════════════════════════════════════════════════════════ -->
+
+  <graph level="L2" id="L2_ingest" parent="op_db_pull">
+    <nodes>
+      <node id="tool_wget" type="ToolCall" label="wget recursive download"
+        tool="wget" tool_version="system"
+        parameters_ref="params_wget"
+        inputs="" outputs="raw_files"/>
+    </nodes>
+    <edges>
+      <edge source="params_wget" target="tool_wget" type="parameterizes"/>
+      <edge source="tool_wget"   target="raw_files" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_convert" parent="op_convert_mzxml">
+    <nodes>
+      <node id="tool_msconvert" type="ToolCall" label="MSConvert — centroid mzXML"
+        tool="MSConvert" tool_version="3.019014"
+        parameters_ref="params_msconvert"
+        inputs="raw_files" outputs="mzxml_files"/>
+    </nodes>
+    <edges>
+      <edge source="params_msconvert" target="tool_msconvert" type="parameterizes"/>
+      <edge source="raw_files"        target="tool_msconvert" type="dataflow"/>
+      <edge source="tool_msconvert"   target="mzxml_files"    type="dataflow"/>
+      <edge source="tool_msconvert"   target="prov_msconvert" type="provenance"/>
+    </edges>
+    <provenance>
+      <record id="prov_msconvert" software="MSConvert" version="3.019014" vendor="ProteoWizard"/>
+    </provenance>
+  </graph>
+
+  <graph level="L2" id="L2_ms1_detect" parent="op_ms1_detect">
+    <nodes>
+      <node id="tool_ms1_detect" type="ToolCall" label="MZmine MS1 Mass Detection"
+        tool="MZmine" tool_version="2.33" module="Mass Detection"
+        parameters_ref="params_ms1_detection"
+        inputs="mzxml_files" outputs="ms1_mass_list"/>
+    </nodes>
+    <edges>
+      <edge source="params_ms1_detection" target="tool_ms1_detect" type="parameterizes"/>
+      <edge source="mzxml_files"          target="tool_ms1_detect" type="dataflow"/>
+      <edge source="tool_ms1_detect"      target="ms1_mass_list"   type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_ms2_detect" parent="op_ms2_detect">
+    <nodes>
+      <node id="tool_ms2_detect" type="ToolCall" label="MZmine MS2 Mass Detection"
+        tool="MZmine" tool_version="2.33" module="Mass Detection"
+        parameters_ref="params_ms2_detection"
+        inputs="mzxml_files" outputs="ms2_mass_list"/>
+    </nodes>
+    <edges>
+      <edge source="params_ms2_detection" target="tool_ms2_detect" type="parameterizes"/>
+      <edge source="mzxml_files"          target="tool_ms2_detect" type="dataflow"/>
+      <edge source="tool_ms2_detect"      target="ms2_mass_list"   type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_chrom_build" parent="op_chrom_build">
+    <nodes>
+      <node id="tool_chrom_builder" type="ToolCall" label="MZmine ADAP Chromatogram Builder"
+        tool="MZmine" tool_version="2.33" module="ADAP Chromatogram Builder"
+        parameters_ref="params_chrom_builder"
+        inputs="ms1_mass_list mzxml_files" outputs="chromatograms"/>
+    </nodes>
+    <edges>
+      <edge source="params_chrom_builder" target="tool_chrom_builder" type="parameterizes"/>
+      <edge source="ms1_mass_list"        target="tool_chrom_builder" type="dataflow"/>
+      <edge source="mzxml_files"          target="tool_chrom_builder" type="dataflow"/>
+      <edge source="tool_chrom_builder"   target="chromatograms"      type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_deconvolve" parent="op_deconvolve">
+    <nodes>
+      <node id="tool_deconvolution" type="ToolCall" label="MZmine Local Minimum Search Deconvolution"
+        tool="MZmine" tool_version="2.33" module="Chromatogram Deconvolution — Local Minimum Search"
+        parameters_ref="params_deconvolution"
+        inputs="chromatograms" outputs="deconvolved_peaks"/>
+    </nodes>
+    <edges>
+      <edge source="params_deconvolution" target="tool_deconvolution" type="parameterizes"/>
+      <edge source="chromatograms"        target="tool_deconvolution" type="dataflow"/>
+      <edge source="tool_deconvolution"   target="deconvolved_peaks"  type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_isotope_group" parent="op_isotope_group">
+    <nodes>
+      <node id="tool_isotope_grouper" type="ToolCall" label="MZmine Isotopic Peak Grouper"
+        tool="MZmine" tool_version="2.33" module="Isotopic Peak Grouper"
+        parameters_ref="params_isotope_grouper"
+        inputs="deconvolved_peaks" outputs="isotope_grouped_peaks"/>
+    </nodes>
+    <edges>
+      <edge source="params_isotope_grouper" target="tool_isotope_grouper" type="parameterizes"/>
+      <edge source="deconvolved_peaks"      target="tool_isotope_grouper" type="dataflow"/>
+      <edge source="tool_isotope_grouper"   target="isotope_grouped_peaks" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_align" parent="op_align">
+    <nodes>
+      <node id="tool_join_aligner" type="ToolCall" label="MZmine Join Aligner"
+        tool="MZmine" tool_version="2.33" module="Join Aligner"
+        parameters_ref="params_join_aligner"
+        inputs="isotope_grouped_peaks" outputs="aligned_feature_table"/>
+    </nodes>
+    <edges>
+      <edge source="params_join_aligner"  target="tool_join_aligner"    type="parameterizes"/>
+      <edge source="isotope_grouped_peaks" target="tool_join_aligner"   type="dataflow"/>
+      <edge source="tool_join_aligner"    target="aligned_feature_table" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_row_filter" parent="op_row_filter">
+    <nodes>
+      <node id="tool_row_filter" type="ToolCall" label="MZmine Peak List Row Filter"
+        tool="MZmine" tool_version="2.33" module="Peak List Row Filter"
+        parameters_ref="params_row_filter"
+        inputs="aligned_feature_table" outputs="filtered_feature_table"/>
+    </nodes>
+    <edges>
+      <edge source="params_row_filter"      target="tool_row_filter"       type="parameterizes"/>
+      <edge source="aligned_feature_table"  target="tool_row_filter"       type="dataflow"/>
+      <edge source="tool_row_filter"        target="filtered_feature_table" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_gap_fill" parent="op_gap_fill">
+    <nodes>
+      <node id="tool_gap_fill" type="ToolCall" label="MZmine Gap Filling — Peak Finder"
+        tool="MZmine" tool_version="2.33" module="Gap Filling — Peak Finder"
+        parameters_ref="params_gap_fill"
+        inputs="filtered_feature_table" outputs="gapfilled_feature_table"/>
+    </nodes>
+    <edges>
+      <edge source="params_gap_fill"         target="tool_gap_fill"           type="parameterizes"/>
+      <edge source="filtered_feature_table"  target="tool_gap_fill"           type="dataflow"/>
+      <edge source="tool_gap_fill"           target="gapfilled_feature_table" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_export" parent="op_export">
+    <nodes>
+      <node id="tool_export_mgf" type="ToolCall" label="MZmine Export — MGF"
+        tool="MZmine" tool_version="2.33" module="Export — MGF"
+        inputs="gapfilled_feature_table" outputs="mgf_file"/>
+      <node id="tool_export_csv" type="ToolCall" label="MZmine Export — CSV"
+        tool="MZmine" tool_version="2.33" module="Export — CSV"
+        inputs="gapfilled_feature_table" outputs="csv_feature_table"/>
+    </nodes>
+    <edges>
+      <edge source="gapfilled_feature_table" target="tool_export_mgf" type="dataflow"/>
+      <edge source="gapfilled_feature_table" target="tool_export_csv" type="dataflow"/>
+      <edge source="tool_export_mgf"         target="mgf_file"        type="dataflow"/>
+      <edge source="tool_export_csv"         target="csv_feature_table" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_blank_filter" parent="op_blank_filter">
+    <nodes>
+      <node id="tool_blank_filter" type="ToolCall" label="Blank Subtraction R Script"
+        tool="R" environment="Jupyter Notebook"
+        parameters_ref="MISSING"
+        inputs="csv_feature_table" outputs="blank_filtered_csv"/>
+    </nodes>
+    <edges>
+      <edge source="csv_feature_table"  target="tool_blank_filter" type="dataflow"/>
+      <edge source="tool_blank_filter"  target="blank_filtered_csv" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_feature_filter" parent="op_feature_filter">
+    <nodes>
+      <node id="tool_feature_filter" type="ToolCall" label="6-Sample Population Filter R Script"
+        tool="R" environment="Jupyter Notebook"
+        script="CoreMetabolome_6SampleFiltering_R_Processing.ipynb"
+        script_url="https://github.com/jhaffner09/core_metabolome_2021/blob/main/CoreMetabolome_6SampleFiltering_R_Processing.ipynb"
+        inputs="blank_filtered_csv" outputs="feature_filtered_csv"/>
+    </nodes>
+    <edges>
+      <edge source="blank_filtered_csv"  target="tool_feature_filter" type="dataflow"/>
+      <edge source="tool_feature_filter" target="feature_filtered_csv" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_tic_norm" parent="op_tic_norm">
+    <nodes>
+      <node id="tool_tic_norm" type="ToolCall" label="TIC Normalization R Script"
+        tool="R" environment="Jupyter Notebook"
+        script="CoreMetabolome_Data_Normalization_code.ipynb"
+        script_url="https://github.com/jhaffner09/core_metabolome_2021/blob/main/CoreMetabolome_Data_Normalization_code.ipynb"
+        inputs="feature_filtered_csv" outputs="normalized_csv"/>
+    </nodes>
+    <edges>
+      <edge source="feature_filtered_csv" target="tool_tic_norm"   type="dataflow"/>
+      <edge source="tool_tic_norm"        target="normalized_csv"  type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_fbmn" parent="op_fbmn">
+    <nodes>
+      <node id="tool_fbmn" type="ToolCall" label="GNPS Feature-Based Molecular Networking"
+        tool="GNPS FBMN" tool_version="v23"
+        parameters_ref="params_fbmn"
+        inputs="mgf_file normalized_csv" outputs="gnps_network_results library_hits"/>
+    </nodes>
+    <edges>
+      <edge source="params_fbmn"    target="tool_fbmn"            type="parameterizes"/>
+      <edge source="mgf_file"       target="tool_fbmn"            type="dataflow"/>
+      <edge source="normalized_csv" target="tool_fbmn"            type="dataflow"/>
+      <edge source="tool_fbmn"      target="gnps_network_results" type="dataflow"/>
+      <edge source="tool_fbmn"      target="library_hits"         type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_visual_eval" parent="op_visual_eval">
+    <nodes>
+      <node id="tool_cytoscape" type="ToolCall" label="Cytoscape — Mirror Plot / Cosine Score Evaluation"
+        tool="Cytoscape" tool_version="3.7.1"
+        inputs="gnps_network_results" outputs="evaluated_annotations"/>
+    </nodes>
+    <edges>
+      <edge source="gnps_network_results" target="tool_cytoscape"       type="dataflow"/>
+      <edge source="tool_cytoscape"       target="evaluated_annotations" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_mol_class" parent="op_mol_class">
+    <nodes>
+      <node id="tool_molnetenhancer" type="ToolCall" label="MolNetEnhancer + ClassyFire"
+        tool="MolNetEnhancer / ClassyFire"
+        inputs="gnps_network_results" outputs="class_annotations"/>
+    </nodes>
+    <edges>
+      <edge source="gnps_network_results" target="tool_molnetenhancer" type="dataflow"/>
+      <edge source="tool_molnetenhancer"  target="class_annotations"   type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_masst" parent="op_masst">
+    <nodes>
+      <node id="tool_masst" type="ToolCall" label="MASST Cross-Study Spectral Search"
+        tool="MASST"
+        parameters_ref="params_masst"
+        inputs="library_hits" outputs="masst_results"/>
+    </nodes>
+    <edges>
+      <edge source="params_masst"  target="tool_masst"   type="parameterizes"/>
+      <edge source="library_hits"  target="tool_masst"   type="dataflow"/>
+      <edge source="tool_masst"    target="masst_results" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_mmvec" parent="op_mmvec">
+    <nodes>
+      <node id="tool_mmvec" type="ToolCall" label="QIIME2 mmvec + PCA"
+        tool="QIIME2 mmvec / R" environment="Jupyter Notebook"
+        script="R_code_for_mmvec_PCA_plots.ipynb"
+        script_url="https://github.com/jhaffner09/core_metabolome_2021/blob/main/MMvec_Code/R_code_for_mmvec_PCA_plots.ipynb"
+        parameters_ref="MISSING"
+        inputs="normalized_csv" outputs="pca_plots"/>
+    </nodes>
+    <edges>
+      <edge source="normalized_csv" target="tool_mmvec" type="dataflow"/>
+      <edge source="tool_mmvec"     target="pca_plots"  type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_pcoa" parent="op_pcoa">
+    <nodes>
+      <node id="tool_pcoa" type="ToolCall" label="QIIME2 EMPeror PCoA + PERMANOVA"
+        tool="QIIME2 EMPeror"
+        inputs="normalized_csv" outputs="pcoa_plots"/>
+    </nodes>
+    <edges>
+      <edge source="normalized_csv" target="tool_pcoa"  type="dataflow"/>
+      <edge source="tool_pcoa"      target="pcoa_plots" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_kruskal" parent="op_kruskal">
+    <nodes>
+      <node id="tool_kruskal" type="ToolCall" label="Kruskal-Wallis Test"
+        tool="R" environment="Jupyter Notebook"
+        inputs="normalized_csv" outputs="kruskal_pvalues"/>
+    </nodes>
+    <edges>
+      <edge source="normalized_csv"   target="tool_kruskal"    type="dataflow"/>
+      <edge source="tool_kruskal"     target="kruskal_pvalues" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_boxplots" parent="op_boxplots">
+    <nodes>
+      <node id="tool_boxplots" type="ToolCall" label="Boxplots (ggplot2 / rworldmap)"
+        tool="R (ggplot2, rworldmap)" environment="Jupyter Notebook"
+        parameters_ref="params_boxplots"
+        inputs="normalized_csv" outputs="statistical_figures"/>
+    </nodes>
+    <edges>
+      <edge source="params_boxplots" target="tool_boxplots"       type="parameterizes"/>
+      <edge source="normalized_csv"  target="tool_boxplots"       type="dataflow"/>
+      <edge source="tool_boxplots"   target="statistical_figures" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_anova" parent="op_anova">
+    <nodes>
+      <node id="tool_anova" type="ToolCall" label="ANOVA effect size"
+        tool="R (effect size package)"
+        inputs="normalized_csv" outputs="anova_pvalues"/>
+    </nodes>
+    <edges>
+      <edge source="normalized_csv" target="tool_anova"    type="dataflow"/>
+      <edge source="tool_anova"     target="anova_pvalues" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_upset" parent="op_upset">
+    <nodes>
+      <node id="tool_upset" type="ToolCall" label="UpSet Plots (Python)"
+        tool="Python 3 (pandas, UpSetPlot, matplotlib)"
+        inputs="normalized_csv" outputs="statistical_figures"/>
+    </nodes>
+    <edges>
+      <edge source="normalized_csv" target="tool_upset"          type="dataflow"/>
+      <edge source="tool_upset"     target="statistical_figures" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_rf" parent="op_rf">
+    <nodes>
+      <node id="tool_random_forest" type="ToolCall" label="Random Forest Classifier"
+        tool="R"
+        parameters_ref="params_random_forest"
+        inputs="class_annotations" outputs="rf_selected_features"/>
+    </nodes>
+    <edges>
+      <edge source="params_random_forest" target="tool_random_forest"  type="parameterizes"/>
+      <edge source="class_annotations"    target="tool_random_forest"  type="dataflow"/>
+      <edge source="tool_random_forest"   target="rf_selected_features" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <graph level="L2" id="L2_sirius" parent="op_sirius">
+    <nodes>
+      <node id="tool_sirius" type="ToolCall" label="SIRIUS + CANOPUS + ClassyFire"
+        tool="SIRIUS" tool_version="4.4.26"
+        sub_tools="ClassyFire CANOPUS"
+        inputs="rf_selected_features" outputs="sirius_class_annotations"/>
+    </nodes>
+    <edges>
+      <edge source="rf_selected_features"    target="tool_sirius"              type="dataflow"/>
+      <edge source="tool_sirius"             target="sirius_class_annotations" type="dataflow"/>
+    </edges>
+  </graph>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       DATA AVAILABILITY
+       ═══════════════════════════════════════════════════════════════ -->
+  <data_availability>
+    <repository name="MassIVE"       id="MSV000084794"/>
+    <repository name="GNPS FBMN"     versions="v23_with_gapfill v23_no_gapfill six_sample_filter_gapfill six_sample_filter_no_gapfill half_sample_filter_gapfill half_sample_filter_no_gapfill all_sample_filter_gapfill all_sample_filter_no_gapfill"/>
+    <repository name="ReDU Coanalysis" url="https://gnps.ucsd.edu/ProteoSAFe/status.jsp?task=cc2c2d20b20d4bd28c22beb777d2782a"/>
+    <repository name="Metabolomics Workbench" url="https://www.metabolomicsworkbench.org" study_id="ST002320" datatrack_id="3495" doi="http://dx.doi.org/10.21228/M8N999"/>
+    <repository name="GitHub"        url="https://github.com/jhaffner09/core_metabolome_2021"/>
+    <repository name="Qiita"         study_id="13802" note="also see study ID 1442 for Norman, Tunapuco, and Matses data"/>
+  </data_availability>
+
+</workflow>
