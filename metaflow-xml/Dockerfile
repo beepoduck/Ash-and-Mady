@@ -41,18 +41,14 @@ ENV PATH="/opt/MZmine-2.33:${PATH}"
 # 6. PIPELINE SCRIPTS
 RUN mkdir -p /data /usr/local/share
 
-COPY get_massive_id.py         /usr/local/bin/get_massive_id.py
 COPY generate_mzmine_batch.py  /usr/local/bin/generate_mzmine_batch.py
-COPY pull_data.sh              /usr/local/bin/pull_data.sh
 COPY pipeline.sh               /usr/local/bin/pipeline.sh
 
 # workflow XML is NOT baked in — users mount their own at runtime:
 #   -v /path/to/your_workflow.xml:/usr/local/share/metabolomics_workflow.xml
 
 RUN chmod +x \
-    /usr/local/bin/get_massive_id.py \
     /usr/local/bin/generate_mzmine_batch.py \
-    /usr/local/bin/pull_data.sh \
     /usr/local/bin/pipeline.sh
 
 WORKDIR /data

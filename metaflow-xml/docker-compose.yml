@@ -1,16 +1,23 @@
 services:
+
+  # ── Pipeline ───────────────────────────────────────────────────────────────
+  # Runs MSConvert, MZmine batch generation, and MZmine feature detection.
+  # Raw data must already be present in ./data/raw before running.
+  # See README.md for download instructions.
+  #
+  #   docker compose up
+  #
   metaflow-xml:
     build: .
     image: metaflow-xml
     volumes:
-      # Pipeline outputs (raw files, mzXML, feature table, MGF) land here
-      - ./data:/data
-      # Mount your workflow XML — edit the left side to point at your file
-      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro
+      - /Users/madeleinevanzuylen/Raw_data/pos:/data/raw   # input:  your raw MS files
+      - ./data/mzxml:/data/mzxml                           # output: converted mzXML files
+      - ./data/output:/data/output                         # output: MGF, CSV, feature table
+      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro  # input: workflow XML
     environment:
-      # Override any pipeline directory if needed
       - RAW_DIR=/data/raw
       - MZXML_DIR=/data/mzxml
       - OUTPUT_DIR=/data/output
-      - BATCH_XML=/data/mzmine_batch.xml
+      - BATCH_XML=/data/output/mzmine_batch.xml
       - WORKFLOW_XML_PATH=/usr/local/share/metabolomics_workflow.xml

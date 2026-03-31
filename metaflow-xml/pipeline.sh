@@ -19,21 +19,21 @@ if [ ! -f "${WORKFLOW_XML_PATH}" ]; then
     exit 1
 fi
 
-# ── Extract MassIVE dataset ID from workflow XML ───────────────────
-echo "=== [stage_parse] Reading dataset ID from workflow XML ==="
-DATASET_ID=$(python3 /usr/local/bin/get_massive_id.py "${WORKFLOW_XML_PATH}")
-echo "[stage_parse] Dataset ID: ${DATASET_ID}"
-
-# ── Stage: Access Raw Data ─────────────────────────────────────────
-echo "=== [stage_ingest] Pulling raw data from MassIVE ==="
-bash /usr/local/bin/pull_data.sh "${RAW_DIR}" "${DATASET_ID}"
+# ── Validate raw data is present ──────────────────────────────────
+if [ -z "$(ls -A "${RAW_DIR}" 2>/dev/null)" ]; then
+    echo "ERROR: No raw data found in ${RAW_DIR}" >&2
+    echo "       Mount your raw files with:" >&2
+    echo "       -v /path/to/your/raw/files:${RAW_DIR}" >&2
+    exit 1
+fi
+echo "=== [stage_ingest] Raw data found in ${RAW_DIR} ==="
 
 # ── Stage: Process Raw MS Files ────────────────────────────────────
-echo "=== [stage_convert] Converting to centroided mzXML ==="
-mkdir -p "${MZXML_DIR}"
-wine msconvert "${RAW_DIR}"/*.raw \
+ echo "=== [stage_convert] Converting to centroided mzXML ==="
+ mkdir -p "${MZXML_DIR}"
+ wine msconvert "${RAW_DIR}"/*.raw \
   --mzXML \
-  --filter "peakPicking centroid ms1-2" \
+  --filter "peakPicking vendor msLevel=1-2" \
   --outdir "${MZXML_DIR}"
 
 # ── Stage: Generate MZmine batch XML ──────────────────────────────
@@ -47,6 +47,6 @@ python3 /usr/local/bin/generate_mzmine_batch.py \
 
 # ── Stage: Generate Feature Table (MZmine 2.33 batch) ─────────────
 echo "=== [stage_features] Running MZmine batch ==="
-/opt/MZmine-2.33/startMZmine_Linux.sh "${BATCH_XML}"
+cd /opt/MZmine-2.33 && bash startMZmine_Linux.sh "${BATCH_XML}"
 
 echo "=== Pipeline complete. Outputs written to ${OUTPUT_DIR} ==="
