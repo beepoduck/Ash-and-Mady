@@ -1,0 +1,50 @@
+services:
+
+  # ── Downloader ─────────────────────────────────────────────────────────────
+  # Downloads raw data from MassIVE via Globus HTTPS (port 443).
+  # Run once before the pipeline:
+  #
+  #   docker compose run --rm downloader
+  #
+  # A URL will be printed — open it in your browser to authenticate with
+  # Globus, then paste the authorization code back in the terminal.
+  # Files are written to /Users/madeleinevanzuylen/Raw_data/pos on your Mac.
+  #
+  downloader:
+    build: .
+    image: metaboflow-xml
+    profiles: ["download"]
+    volumes:
+      - ./data/raw:/data/raw
+      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro
+    entrypoint: ["python3", "/usr/local/bin/globus_download.py"]
+    command:
+      - "--workflow"
+      - "/usr/local/share/metabolomics_workflow.xml"
+      - "--output-dir"
+      - "/data/raw"
+      - "--subpath"
+      - "peak"
+
+  # ── Pipeline ───────────────────────────────────────────────────────────────
+  # Runs MSConvert, MZmine batch generation, and MZmine feature detection.
+  # Raw data must already be present before running. Download first with:
+  #
+  #   docker compose run --rm downloader
+  #
+  #   docker compose up
+  #
+  metaboflow-xml:
+    build: .
+    image: metaboflow-xml
+    volumes:
+      - ./data/raw:/data/raw                               # input:  your raw MS files
+      - ./data/mzxml:/data/mzxml                           # output: converted mzXML files
+      - ./data/output:/data/output                         # output: MGF, CSV, feature table
+      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro  # input: workflow XML
+    environment:
+      - RAW_DIR=/data/raw
+      - MZXML_DIR=/data/mzxml
+      - OUTPUT_DIR=/data/output
+      - BATCH_XML=/data/output/mzmine_batch.xml
+      - WORKFLOW_XML_PATH=/usr/local/share/metabolomics_workflow.xml
