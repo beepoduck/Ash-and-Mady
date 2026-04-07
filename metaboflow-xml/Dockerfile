@@ -10,13 +10,11 @@ RUN mkdir -p /usr/share/man/man1 \
     && apt-get update && apt-get install -y --no-install-recommends \
     openjdk-8-jre \
     python3 \
-    python3-pip \
     unzip \
     wget \
     curl \
     rsync \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip3 install globus-sdk requests
+    && rm -rf /var/lib/apt/lists/*
 
 # 4. INSTALL MZmine 2.33
 # Official v2.33 release asset (github.com/mzmine/mzmine2)
@@ -44,8 +42,6 @@ ENV PATH="/opt/MZmine-2.33:${PATH}"
 RUN mkdir -p /data /usr/local/share
 
 COPY generate_mzmine_batch.py  /usr/local/bin/generate_mzmine_batch.py
-COPY get_massive_id.py         /usr/local/bin/get_massive_id.py
-COPY globus_download.py        /usr/local/bin/globus_download.py
 COPY pipeline.sh               /usr/local/bin/pipeline.sh
 
 # workflow XML is NOT baked in — users mount their own at runtime:
@@ -53,8 +49,6 @@ COPY pipeline.sh               /usr/local/bin/pipeline.sh
 
 RUN chmod +x \
     /usr/local/bin/generate_mzmine_batch.py \
-    /usr/local/bin/get_massive_id.py \
-    /usr/local/bin/globus_download.py \
     /usr/local/bin/pipeline.sh
 
 WORKDIR /data

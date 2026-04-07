@@ -1,36 +1,12 @@
 services:
 
-  # ── Downloader ─────────────────────────────────────────────────────────────
-  # Downloads raw data from MassIVE via Globus HTTPS (port 443).
-  # Run once before the pipeline:
-  #
-  #   docker compose run --rm downloader
-  #
-  # A URL will be printed — open it in your browser to authenticate with
-  # Globus, then paste the authorization code back in the terminal.
-  # Files are written to /Users/madeleinevanzuylen/Raw_data/pos on your Mac.
-  #
-  downloader:
-    build: .
-    image: metaboflow-xml
-    profiles: ["download"]
-    volumes:
-      - ./data/raw:/data/raw
-      - ./workflow.xml:/usr/local/share/metabolomics_workflow.xml:ro
-    entrypoint: ["python3", "/usr/local/bin/globus_download.py"]
-    command:
-      - "--workflow"
-      - "/usr/local/share/metabolomics_workflow.xml"
-      - "--output-dir"
-      - "/data/raw"
-      - "--subpath"
-      - "peak"
-
   # ── Pipeline ───────────────────────────────────────────────────────────────
   # Runs MSConvert, MZmine batch generation, and MZmine feature detection.
-  # Raw data must already be present before running. Download first with:
+  # Raw data must be downloaded first by running setup.sh on your Mac:
   #
-  #   docker compose run --rm downloader
+  #   bash setup.sh
+  #
+  # Or if you already have raw data, just run:
   #
   #   docker compose up
   #

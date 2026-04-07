@@ -24,7 +24,7 @@ if [ -z "$(ls -A "${RAW_DIR}" 2>/dev/null)" ]; then
     echo "ERROR: No raw data found in ${RAW_DIR}" >&2
     echo "       Mount your raw files with:" >&2
     echo "       -v /path/to/your/raw/files:${RAW_DIR}" >&2
-    echo "       Or download via Globus: docker compose run --rm downloader" >&2
+    echo "       Or run: bash setup.sh" >&2
     exit 1
 fi
 echo "=== [stage_ingest] Raw data found in ${RAW_DIR} ==="
